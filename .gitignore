@@ -7,6 +7,8 @@
 *.sln.docstates
 *.sln
 *.pyproj
+*.pyc
+*.pyo
 
 # Build results
 [Dd]ebug/

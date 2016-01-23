@@ -1,7 +1,8 @@
-import RPi.GPIO as GPIO
-import spi as SPI
+import Adafruit_GPIO as GPIO
+import Adafruit_GPIO.SPI as SPI
 import signal
 import time
+import re
 
 class RFID:
     pin_rst = 22
@@ -36,12 +37,17 @@ class RFID:
     authed = False
 
     def __init__(self, dev='/dev/spidev0.0', speed=1000000, pin_rst=22):
+        m = re.match(r"/dev/spidev(\d+)\.(\d+)", dev)
+        self.port = int(m.group(1))
+        self.device = int(m.group(2))
+
         self.pin_rst = pin_rst
 
-        SPI.openSPI(device=dev, speed=speed)
-        GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(pin_rst, GPIO.OUT)
-        GPIO.output(pin_rst, 1)
+        self.spi = SPI.SpiDev(self.port, self.device, max_speed_hz=speed)
+        self.gpio = GPIO.get_platform_gpio()
+        self.gpio.setup(pin_rst, GPIO.OUT)
+        self.gpio.set_high(pin_rst)
+
         self.reset()
         self.dev_write(0x2A, 0x8D)
         self.dev_write(0x2B, 0x3E)
@@ -52,10 +58,10 @@ class RFID:
         self.set_antenna(True)
 
     def dev_write(self, address, value):
-        SPI.transfer(((address << 1) & 0x7E, value))
+        self.spi.transfer([(address << 1) & 0x7E, value])
 
     def dev_read(self, address):
-        return SPI.transfer((((address << 1) & 0x7E) | 0x80, 0))[1]
+        return self.spi.transfer([((address << 1) & 0x7E) | 0x80, 0])[1]
 
     def set_bitmask(self, address, mask):
         current = self.dev_read(address)
@@ -319,7 +325,7 @@ class RFID:
         """
         if self.authed:
             self.stop_crypto()
-        GPIO.cleanup()
+        self.gpio.cleanup()
 
     def util(self):
         """
